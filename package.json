@@ -1,0 +1,19 @@
+{
+  "name": "nova-drive",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@thatopen/components": "^3.4.6",
+    "@thatopen/components-front": "^3.4.3",
+    "three": "^0.182.0",
+    "web-ifc": "^0.0.77"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

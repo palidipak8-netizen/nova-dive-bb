@@ -1,4 +1,8 @@
 const STORAGE_KEY = "nova-drive-prototype-v1";
+import * as OBC from "@thatopen/components";
+import * as OBCFRONT from "@thatopen/components-front";
+import * as THREE from "three";
+
 const SESSION_KEY = "nova-drive-session-token";
 const isLocalHost =
   window.location.hostname === "localhost" ||
@@ -118,6 +122,8 @@ const state = loadState();
 let useRemote = false;
 let isAuthenticated = false;
 let sessionToken = localStorage.getItem(SESSION_KEY) || "";
+let threePromise = null;
+let threeState = null;
 
 function loadState() {
   try {
@@ -227,7 +233,7 @@ function canEditFile(file) {
 }
 
 function canDownloadFile(file) {
-  return ["owner", "manager"].includes(state.currentRole) || file?.permission === "download";
+  return ["owner", "manager"].includes(state.currentRole);
 }
 
 function canManageAccess() {
@@ -236,6 +242,154 @@ function canManageAccess() {
 
 function canCreateContent() {
   return ["owner", "manager", "editor"].includes(state.currentRole);
+}
+
+function isSpreadsheet(file) {
+  const name = file?.name?.toLowerCase() || "";
+  return ["sheet", "xlsx", "xls", "csv"].some((ext) => name.endsWith(`.${ext}`));
+}
+
+function isPdf(file) {
+  return (file?.name || "").toLowerCase().endsWith(".pdf");
+}
+
+function isImage(file) {
+  return ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].some((ext) => (file?.name || "").toLowerCase().endsWith(`.${ext}`));
+}
+
+function isIfc(file) {
+  return (file?.name || "").toLowerCase().endsWith(".ifc");
+}
+
+function isCad(file) {
+  return ["dwg", "dxf", "step", "stp", "iges", "igs", "obj", "stl"].some((ext) => (file?.name || "").toLowerCase().endsWith(`.${ext}`));
+}
+
+async function ensureThree() {
+  if (!threePromise) {
+    threePromise = Promise.all([
+      import("https://esm.sh/three@0.160.0?bundle"),
+      import("https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls?bundle"),
+      import("https://esm.sh/web-ifc-three@0.0.117?bundle"),
+    ]).then(([three, controls, ifc]) => ({
+      THREE: three,
+      OrbitControls: controls.OrbitControls,
+      IFCLoader: ifc.IFCLoader,
+    })).catch((error) => {
+      threePromise = null;
+      throw error;
+    });
+  }
+  return threePromise;
+}
+
+async function ensureIfcViewer(container) {
+  const mod = await ensureThree();
+  if (threeState?.container === container) return threeState;
+
+  const { THREE, OrbitControls, IFCLoader } = mod;
+  if (!THREE || !OrbitControls || !IFCLoader) throw new Error("Three.js IFC loader could not be loaded.");
+
+  container.innerHTML = `
+    <div class="ifc-toolbar">
+      <button type="button" data-ifc-action="fit">Fit</button>
+      <button type="button" data-ifc-action="section">Toggle Section</button>
+      <button type="button" data-ifc-action="clear">Clear Section</button>
+    </div>
+    <div class="ifc-viewwrap">
+      <canvas class="ifc-canvas" data-ifc-canvas></canvas>
+    </div>
+    <div class="ifc-status" data-ifc-status>Loading IFC viewer...</div>
+  `;
+
+  const canvas = container.querySelector("[data-ifc-canvas]");
+  const status = container.querySelector("[data-ifc-status]");
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf6f9ff);
+  const camera = new THREE.PerspectiveCamera(60, container.clientWidth / 360, 0.1, 10000);
+  camera.position.set(10, 10, 10);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  renderer.setSize(container.clientWidth, 360, false);
+  renderer.localClippingEnabled = true;
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0, 0);
+  controls.update();
+  scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+  dir.position.set(5, 10, 7);
+  scene.add(dir);
+  const grid = new THREE.GridHelper(20, 20, 0xbfd4ff, 0xd8e5ff);
+  scene.add(grid);
+  const clipPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+  const ifcLoader = new IFCLoader();
+  ifcLoader.ifcManager.setWasmPath("https://cdn.jsdelivr.net/npm/web-ifc@0.0.71/", true);
+  const animate = () => {
+    renderer.render(scene, camera);
+    if (threeState?.raf) threeState.raf = requestAnimationFrame(animate);
+  };
+  const onResize = () => {
+    const width = container.clientWidth;
+    renderer.setSize(width, 360, false);
+    camera.aspect = width / 360;
+    camera.updateProjectionMatrix();
+  };
+  const onFit = () => {
+    const box = new THREE.Box3().setFromObject(scene);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const max = Math.max(size.x, size.y, size.z);
+    camera.position.copy(center).add(new THREE.Vector3(max, max, max));
+    controls.target.copy(center);
+    controls.update();
+  };
+  const state = { container, THREE, scene, camera, renderer, controls, ifcLoader, status, clipPlane, onResize, onFit, model: null, raf: requestAnimationFrame(animate) };
+  window.addEventListener("resize", onResize);
+  container.querySelector('[data-ifc-action="fit"]').addEventListener("click", onFit);
+  container.querySelector('[data-ifc-action="section"]').addEventListener("click", () => {
+    if (state.model) {
+      state.model.traverse((obj) => {
+        if (obj.material) {
+          obj.material.clippingPlanes = obj.material.clippingPlanes?.length ? [] : [clipPlane];
+          obj.material.needsUpdate = true;
+        }
+      });
+    }
+  });
+  container.querySelector('[data-ifc-action="clear"]').addEventListener("click", () => {
+    if (state.model) {
+      state.model.traverse((obj) => {
+        if (obj.material) {
+          obj.material.clippingPlanes = [];
+          obj.material.needsUpdate = true;
+        }
+      });
+    }
+  });
+  threeState = state;
+  status.textContent = "IFC viewer ready.";
+  return state;
+}
+
+async function loadIfcModel(activeFile, mount) {
+  const state = await ensureIfcViewer(mount);
+  state.status.textContent = "Loading IFC model...";
+  const previewUrl = `${API_BASE}/api/files/${activeFile.id}/preview${sessionToken ? `?auth=${encodeURIComponent(sessionToken)}` : ""}`;
+  if (state.model) {
+    state.scene.remove(state.model);
+    state.model = null;
+  }
+  const model = await state.ifcLoader.loadAsync(previewUrl);
+  model.traverse((obj) => {
+    if (obj.isMesh && obj.material) {
+      obj.material.clippingPlanes = [];
+      obj.material.side = state.THREE.DoubleSide;
+    }
+  });
+  state.scene.add(model);
+  state.model = model;
+  state.status.textContent = "IFC model loaded.";
+  state.onFit();
 }
 
 function getVisibleFiles() {
@@ -426,9 +580,19 @@ function render() {
       <div class="preview-title">${activeFile.name}</div>
       <div class="preview-meta">${activeFile.type} · ${activeFile.modified} · ${getFolderById(activeFile.folderId)?.name || "Unknown"}</div>
       ${
-        ["PDF", "Doc", "Sheet"].includes(activeFile.type)
-          ? `<textarea id="previewEditor" class="preview-editor">${activeFile.content || ""}</textarea><button class="secondary-btn preview-save" id="previewSaveBtn" type="button">Save Content</button>`
-          : `<div>${activeFile.content || "No preview content available."}</div>`
+        isPdf(activeFile)
+          ? `<iframe class="file-viewer" src="${API_BASE}/api/files/${activeFile.id}/download" title="${activeFile.name}"></iframe>`
+          : isImage(activeFile)
+            ? `<img class="file-viewer image-viewer" src="${API_BASE}/api/files/${activeFile.id}/download" alt="${activeFile.name}" />`
+            : isSpreadsheet(activeFile)
+              ? `<div class="sheet-viewer"><div class="preview-note">Spreadsheet preview is limited in-browser. Use Download to open in Excel, or store CSV content for inline viewing.</div><pre class="sheet-pre">${activeFile.content || "No spreadsheet preview available."}</pre></div>`
+              : isIfc(activeFile)
+                ? `<div class="cad-viewer"><div class="preview-note">IFC viewer loading...</div><div class="ifc-viewer" data-ifc-viewer="${activeFile.id}"></div></div>`
+                : isCad(activeFile)
+                  ? `<div class="cad-viewer"><div class="preview-note">CAD preview is not fully rendered yet. Download is available for manager users.</div><iframe class="file-viewer" src="${API_BASE}/api/files/${activeFile.id}/download" title="${activeFile.name}"></iframe></div>`
+                  : ["Doc", "TXT"].includes(activeFile.type)
+                    ? `<textarea id="previewEditor" class="preview-editor">${activeFile.content || ""}</textarea><button class="secondary-btn preview-save" id="previewSaveBtn" type="button">Save Content</button>`
+                    : `<div>${activeFile.content || "No preview content available."}</div>`
       }
     `
     : `<div class="preview-empty">Select a file to preview its content here.</div>`;
@@ -465,6 +629,17 @@ function render() {
     : `<div class="detail-item"><div class="detail-label">Empty</div><div class="detail-value">Select a file to see details.</div></div>`;
 
   saveState();
+  if (activeFile && isIfc(activeFile)) {
+    queueMicrotask(async () => {
+      const mount = document.querySelector("[data-ifc-viewer]");
+      if (!mount || mount.dataset.ifcViewer !== activeFile.id) return;
+      try {
+        await loadIfcModel(activeFile, mount);
+      } catch (error) {
+        mount.innerHTML = `<div class="preview-note">IFC viewer failed to load: ${error.message || "unknown error"}</div>`;
+      }
+    });
+  }
   hideContextMenu();
 }
 

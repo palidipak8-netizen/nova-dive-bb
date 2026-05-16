@@ -102,6 +102,13 @@ async function getActor(request, env) {
   return { user: "guest", role: "viewer" };
 }
 
+async function getQueryActor(url, env) {
+  const token = url.searchParams.get("auth");
+  const session = await verifySession(token, env);
+  if (session) return session;
+  return { user: "guest", role: "viewer" };
+}
+
 function canWrite(actor) {
   return actor.role === "owner" || actor.role === "manager" || actor.role === "editor";
 }
@@ -311,6 +318,26 @@ export default {
           headers: {
             "content-type": row.mimeType || "application/octet-stream",
             "content-disposition": `attachment; filename="${row.name.replace(/"/g, '\\"')}"`,
+            "access-control-allow-origin": corsOrigin,
+            "access-control-allow-credentials": "true",
+          },
+        });
+      }
+
+      if (request.method === "GET" && path.startsWith("/api/files/") && path.endsWith("/preview")) {
+        const id = path.split("/")[3];
+        const row = await env.DB.prepare(
+          "SELECT id, folder_id as folderId, name, mime_type as mimeType, r2_key as r2Key FROM files WHERE id = ?"
+        ).bind(id).first();
+        if (!row) return json({ error: "not found" }, { status: 404 }, corsOrigin);
+        const queryActor = await getQueryActor(url, env);
+        if (queryActor.user === "guest" && actor.user === "guest") return json({ error: "forbidden" }, { status: 403 }, corsOrigin);
+        const object = await env.FILES.get(row.r2Key);
+        if (!object) return json({ error: "not found" }, { status: 404 }, corsOrigin);
+        return new Response(object.body, {
+          status: 200,
+          headers: {
+            "content-type": row.mimeType || "application/octet-stream",
             "access-control-allow-origin": corsOrigin,
             "access-control-allow-credentials": "true",
           },
