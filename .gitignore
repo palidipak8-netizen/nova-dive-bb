@@ -1,0 +1,11 @@
+.wrangler/
+node_modules/
+dist/
+build/
+coverage/
+*.log
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.DS_Store
+Thumbs.db
