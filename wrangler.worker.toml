@@ -1,0 +1,15 @@
+name = "nova-drive-api"
+main = "src/worker.js"
+compatibility_date = "2026-05-16"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nova_drive_db"
+database_id = "df130df1-2ffb-453c-9a15-2e3979b5c892"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "nova-drive-files"
+
+[vars]
+CORS_ORIGIN = "https://nova-drive-frontend.pages.dev"

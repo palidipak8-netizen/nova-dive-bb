@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Nova Drive</title>
+      <meta name="api-base" content="https://nova-drive-api.nova-drive-bb.workers.dev" />
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="auth-screen" id="authScreen">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="brand-mark">N</div>
+          <div>
+            <div class="brand-name">Nova Drive</div>
+            <div class="brand-subtitle">Sign in to continue</div>
+          </div>
+        </div>
+        <h1>Access your drive</h1>
+        <p>Sign in with your account to open files, folders, and sharing tools.</p>
+        <div class="auth-fields">
+          <input id="authEmail" type="email" placeholder="Gmail or email address" />
+          <input id="authPass" type="password" placeholder="Password" />
+        </div>
+        <div class="auth-status" id="authStatus">Enter your credentials to continue.</div>
+        <div class="auth-actions">
+          <button class="primary-btn" id="loginBtn" type="button">Log in</button>
+          <button class="secondary-btn" id="signupBtn" type="button">Sign up</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">N</div>
+          <div>
+            <div class="brand-name">Nova Drive</div>
+            <div class="brand-subtitle">Files, folders, sharing</div>
+          </div>
+        </div>
+
+        <button class="compose-btn" id="newFolderBtn">+ New Folder</button>
+        <button class="upload-btn" id="uploadBtn">Upload File</button>
+
+        <nav class="nav">
+          <button class="nav-item active" data-view="all">My Drive</button>
+          <button class="nav-item" data-view="shared-drives">Shared drives</button>
+          <button class="nav-item" data-view="activity">Activity</button>
+          <button class="nav-item" data-view="starred">Starred</button>
+          <button class="nav-item" data-view="recent">Recent</button>
+          <button class="nav-item" data-view="shared">Shared</button>
+          <button class="nav-item" data-view="trash">Trash</button>
+        </nav>
+
+        <div class="tree-card">
+          <div class="tree-head">
+            <span>Folders</span>
+            <button class="tree-home" id="treeHomeBtn" type="button">Home</button>
+          </div>
+          <div class="tree-list" id="treeList"></div>
+        </div>
+
+        <div class="storage-card">
+          <div class="storage-head">
+            <span>Storage</span>
+            <span id="storageText">0 GB of 15 GB</span>
+          </div>
+          <div class="storage-bar">
+            <div class="storage-fill" id="storageFill"></div>
+          </div>
+          <p>Keep your files organized across devices and teams.</p>
+        </div>
+
+        <div class="storage-card">
+          <div class="storage-head">
+            <span>Session</span>
+            <span id="accessLabel">guest</span>
+          </div>
+          <div class="share-row"><input id="authEmailSide" type="email" placeholder="Email address" /></div>
+          <div class="share-row"><input id="authPassSide" type="password" placeholder="Password" /></div>
+          <div class="bulk-actions">
+            <button class="primary-btn" id="loginBtnSide" type="button">Log in</button>
+            <button class="secondary-btn" id="logoutBtn" type="button">Log out</button>
+          </div>
+        </div>
+
+        <div class="storage-card">
+          <div class="storage-head">
+            <span>Health</span>
+            <span id="healthStatus">unknown</span>
+          </div>
+          <p id="healthText">Checking API availability...</p>
+          <button class="secondary-btn" id="healthBtn" type="button">Check Health</button>
+        </div>
+
+        <div class="storage-card">
+          <div class="storage-head">
+            <span>Shared Drives</span>
+            <span id="driveCount">0</span>
+          </div>
+          <div class="share-row"><input id="driveName" type="text" placeholder="Drive name" /></div>
+          <button class="secondary-btn" id="createDriveBtn" type="button">Create Shared Drive</button>
+          <div id="driveList" class="details-view"></div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="pageTitle">My Drive</h1>
+            <p id="pageSubtitle">Browse your folders, documents, and shared assets.</p>
+          </div>
+          <label class="search">
+            <input id="searchInput" type="search" placeholder="Search files and folders" />
+          </label>
+        </header>
+
+        <section class="hero">
+          <div>
+            <div class="hero-label">Quick Access</div>
+            <h2>Manage files with a clean drive-style workspace</h2>
+            <p>
+              Preview folders, upload content, sort by type, and keep everything one click away.
+            </p>
+            <div class="crumb-row">
+              <button class="crumb-back" id="backBtn" type="button">Back</button>
+              <div class="crumb" id="folderCrumb">Current folder: All Files</div>
+            </div>
+          </div>
+          <div class="hero-actions">
+            <button class="secondary-btn" id="sortBtn">Sort by Name</button>
+            <button class="secondary-btn" id="filterBtn">Filters</button>
+            <button class="secondary-btn" id="sortModeBtn">Modified</button>
+            <button class="secondary-btn" id="newFileBtn">New File</button>
+            <button class="primary-btn" id="createDocBtn">Create Doc</button>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Folders</h3>
+              <span id="folderCount">0 items</span>
+            </div>
+            <div class="folder-strip" id="folderStrip"></div>
+          </div>
+
+          <div class="panel dropzone" id="dropzone">
+            <div class="panel-head">
+              <h3>Files</h3>
+              <span id="fileCount">0 files</span>
+            </div>
+            <div class="file-grid" id="fileGrid"></div>
+            <div class="drop-hint" id="dropHint">Drag and drop files here to add them to your drive.</div>
+          </div>
+
+          <aside class="panel details-panel">
+            <div class="panel-head">
+              <h3>Details</h3>
+              <div class="detail-actions">
+                <button class="secondary-btn" id="renameBtn" type="button">Rename</button>
+                <button class="secondary-btn" id="moveBtn" type="button">Move</button>
+                <button class="primary-btn danger-btn" id="deleteBtn" type="button">Delete</button>
+              </div>
+            </div>
+            <div class="preview-pane" id="previewPane"></div>
+            <div class="share-box">
+              <div class="share-head">
+                <strong>Share</strong>
+                <button class="secondary-btn" id="shareBtn" type="button">Create Link</button>
+              </div>
+              <div class="share-row">
+                <span id="shareStatus">Not shared</span>
+                <select id="permissionSelect">
+                  <option value="view">View only</option>
+                  <option value="download">Download</option>
+                  <option value="edit">Edit</option>
+                </select>
+              </div>
+              <input id="shareLink" type="text" readonly placeholder="Share link will appear here" />
+              <div class="share-row">
+                <input id="inviteUser" type="text" placeholder="Invite username" />
+                <select id="inviteRole">
+                  <option value="viewer">Viewer</option>
+                  <option value="editor">Editor</option>
+                  <option value="manager">Manager</option>
+                </select>
+              </div>
+              <div class="share-row">
+                <select id="inviteResource">
+                  <option value="file">Current file</option>
+                  <option value="folder">Current folder</option>
+                </select>
+              </div>
+              <button class="secondary-btn" id="inviteBtn" type="button">Grant Access</button>
+            </div>
+            <div class="bulk-bar" id="bulkBar" hidden>
+              <div id="bulkLabel">0 selected</div>
+              <div class="bulk-actions">
+                <button class="secondary-btn" id="bulkMoveBtn" type="button">Move</button>
+                <button class="secondary-btn" id="bulkTrashBtn" type="button">Trash</button>
+                <button class="secondary-btn" id="bulkRestoreBtn" type="button">Restore</button>
+                <button class="primary-btn danger-btn" id="bulkDeleteBtn" type="button">Delete Forever</button>
+              </div>
+            </div>
+            <div id="detailsView" class="details-view"></div>
+            <div class="share-box">
+              <div class="share-head">
+                <strong>Comments</strong>
+                <button class="secondary-btn" id="refreshCommentsBtn" type="button">Refresh</button>
+              </div>
+              <div id="commentList" class="details-view"></div>
+              <div class="share-row">
+                <input id="commentInput" type="text" placeholder="Add a comment" />
+              </div>
+              <button class="secondary-btn" id="postCommentBtn" type="button">Post Comment</button>
+            </div>
+            <div class="share-box">
+              <div class="share-head">
+                <strong>Versions</strong>
+                <button class="secondary-btn" id="saveVersionBtn" type="button">Save Snapshot</button>
+              </div>
+              <div id="versionList" class="details-view"></div>
+            </div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <input id="fileInput" type="file" hidden multiple />
+    <div class="context-menu" id="contextMenu" hidden>
+      <button data-action="open">Open</button>
+      <button data-action="download">Download</button>
+      <button data-action="new-subfolder">New Subfolder</button>
+      <button data-action="rename">Rename</button>
+      <button data-action="move">Move</button>
+      <button data-action="share">Share</button>
+      <button data-action="access">Access</button>
+      <button data-action="trash">Trash</button>
+      <button data-action="restore">Restore</button>
+      <button data-action="delete">Delete Forever</button>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
